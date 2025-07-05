@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     # Third-party apps
     "rest_framework",
     "rest_framework.authtoken", # Added for token authentication
+    "drf_yasg", # Added for API documentation
     # My apps
     "kafka_manager.apps.KafkaManagerConfig",
 ]

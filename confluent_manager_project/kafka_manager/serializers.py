@@ -438,7 +438,7 @@ class ThroughputResponseSerializer(serializers.Serializer):
 
 
 # General list-of-datapoints response (for consumer lag)
-classGenericMetricListResponseSerializer(serializers.Serializer):
+class GenericMetricListResponseSerializer(serializers.Serializer):
     data = DatapointSerializer(many=True, required=False)
     error = serializers.CharField(required=False)
     details = serializers.JSONField(required=False, allow_null=True)

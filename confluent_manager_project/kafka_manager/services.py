@@ -660,3 +660,6 @@ def get_confluent_cloud_service():
             return {"error": "An unexpected error occurred.", "details": str(e)}
         # No finally block for admin_client.close() as AdminClient doesn't have a close method.
         # It's designed to be relatively lightweight.
+
+    def dummy_method_for_testing_reloads(self):
+        return "dummy_method_called"

@@ -170,10 +170,13 @@ class TopicDetailView(APIView):
 
 # Assuming these serializers are defined in .serializers
 from .serializers import (
+    ClusterSerializer, ClusterListSerializer, # Added back for ClusterListView
+    TopicSerializer, TopicListSerializer, # Added back for TopicListView
+    CommittedOffsetSerializer, CommittedOffsetListSerializer, # Added for CommittedOffsetsView
     DatapointSerializer,
     ThroughputResponseSerializer,
     GenericMetricListResponseSerializer,
-    ErrorSerializer, # Already imported
+    ErrorSerializer,
     TopicDetailsResponseSerializer
 )
 
