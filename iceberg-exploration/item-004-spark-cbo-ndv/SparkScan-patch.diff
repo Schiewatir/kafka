@@ -1,0 +1,73 @@
+--- a/spark/v3.5/spark/src/main/java/org/apache/iceberg/spark/SparkScan.java
++++ b/spark/v3.5/spark/src/main/java/org/apache/iceberg/spark/SparkScan.java
+@@ -30,6 +30,9 @@ import org.apache.iceberg.StatisticsFile;
+ import org.apache.iceberg.Table;
+ import org.apache.iceberg.expressions.Expression;
++import org.apache.iceberg.spark.stats.SparkStatsIntegration;
++import org.apache.iceberg.spark.stats.PuffinColumnStatsConverter.SparkColumnStat;
++import java.util.Map;
+
+ // (existing imports …)
+
+@@ -180,30 +183,22 @@ public abstract class SparkScan implements Scan {
+   private Statistics estimateStatistics(Snapshot snapshot) {
+     // return through if snapshot is null (unpartitioned, empty table)
+     if (snapshot == null) {
+       return new Stats(0L, Map.of());
+     }
+
+     // estimate row count from snapshot summary
+     long rowCount = SnapshotUtil.totalRecordCount(table, snapshot.snapshotId());
+
+-    // BUG: exact-match lookup — silently returns empty after any new append
+-    Optional<StatisticsFile> statsFile =
+-        table.statisticsFiles().stream()
+-            .filter(f -> f.snapshotId() == snapshot.snapshotId())
+-            .findFirst();
+-
+-    if (statsFile.isEmpty() || !reportColumnStats) {
++    if (!reportColumnStats) {
+       return new Stats(rowCount, Map.of());
+     }
+
+-    Map<Integer, ColumnStat> colStats = buildColStats(statsFile.get());
+-    return new Stats(rowCount, toSparkColStats(colStats));
++    // FIX: walk snapshot ancestry to find the most-recent valid statistics file.
++    // This means stats computed before a streaming append are still used by CBO,
++    // rather than being silently discarded (apache/iceberg#13374).
++    Map<String, SparkColumnStat> colStats =
++        SparkStatsIntegration.resolveColumnStats(table, snapshot);
++
++    if (colStats.isEmpty()) {
++      return new Stats(rowCount, Map.of());
++    }
++
++    return new Stats(rowCount, toSparkColStats(colStats));
+   }
+
+-  private Map<Integer, ColumnStat> buildColStats(StatisticsFile statsFile) {
+-    // OLD: matched blobs by field ID against schema at stats-computation time;
+-    // broke on column renames because it compared names, not field IDs.
+-    ...
+-  }
+-
++  /** Maps Puffin-derived column stats to Spark's internal ColumnStat format. */
++  private Map<String, org.apache.spark.sql.catalyst.plans.logical.ColumnStat>
++      toSparkColStats(Map<String, SparkColumnStat> puffinStats) {
++    Map<String, org.apache.spark.sql.catalyst.plans.logical.ColumnStat> result =
++        new java.util.HashMap<>();
++    puffinStats.forEach(
++        (colName, stat) ->
++            result.put(
++                colName,
++                new org.apache.spark.sql.catalyst.plans.logical.ColumnStat(
++                    scala.Option.apply(null),    // min
++                    scala.Option.apply(null),    // max
++                    scala.Option.apply(null),    // nullCount
++                    scala.Option.apply(stat.ndv()),  // ← NDV now populated
++                    scala.Option.apply(null),    // avgLen
++                    scala.Option.apply(null),    // maxLen
++                    scala.collection.immutable.List$.MODULE$.empty(),
++                    0)));
++    return result;
++  }
